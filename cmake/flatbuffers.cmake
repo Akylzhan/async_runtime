@@ -1,3 +1,6 @@
-set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "disable tests" FORCE)
-set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "enable flatc" FORCE)
-add_subdirectory(third_party/flatbuffers)
+CPMAddPackage(
+    URI "gh:google/flatbuffers@2.0.8"
+    OPTIONS
+        "FLATBUFFERS_BUILD_TESTS OFF"
+        "FLATBUFFERS_BUILD_FLATC ON"
+)

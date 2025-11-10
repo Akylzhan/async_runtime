@@ -28,6 +28,7 @@ set(USE_TESTS OFF)
 set(USE_PROFILER OFF)
 set(USE_OPENCV OFF)
 
+include(cmake/CPM.cmake)
 if (WITH_TESTS)
     set(USE_TESTS ON)
 endif()
@@ -98,9 +99,9 @@ endif()
 if (WITH_PROFILER)
     add_custom_target(
             fbs_generation
-            COMMAND ${CMAKE_CURRENT_BINARY_DIR}/third_party/flatbuffers/flatc --cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/fbs/profiler_schema.fbs &&
-                    ${CMAKE_CURRENT_BINARY_DIR}/third_party/flatbuffers/flatc -o ${CMAKE_CURRENT_SOURCE_DIR}/profiler-viewer/ --ts ${CMAKE_CURRENT_SOURCE_DIR}/src/fbs/profiler_schema.fbs
-            DEPENDS flatc)
+            COMMAND ${flatbuffers_BINARY_DIR}/flatc --cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/fbs/profiler_schema.fbs &&
+                    ${flatbuffers_BINARY_DIR}/flatc -o ${CMAKE_CURRENT_SOURCE_DIR}/profiler-viewer/ --ts ${CMAKE_CURRENT_SOURCE_DIR}/src/fbs/profiler_schema.fbs
+            DEPENDS ${flatbuffers_BINARY_DIR}/flatc)
     add_dependencies(${LIB_NAME} fbs_generation)
     target_link_libraries(${LIB_NAME} flatbuffers)
 endif()
