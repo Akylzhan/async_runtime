@@ -9,7 +9,7 @@ static int get_chunks_count(size_t size, size_t chunk_size) {
 }
 
 resource_pool::resource_pool(size_t chunk_sz, size_t nnext_size, size_t nmax_size)
-    : pool(chunk_sz, nnext_size, nmax_size), chunk_size(chunk_sz) {
+    : chunk_size(chunk_sz), pool(chunk_sz, nnext_size, nmax_size) {
 }
 
 resource_pool::~resource_pool() {
@@ -51,7 +51,7 @@ ResourcePoolPtr resource_pools_manager::create_resource(size_t chunk_sz, size_t 
 
     std::lock_guard<std::mutex> lock(mutex);
     pools.emplace_back(pool);
-    return std::move(ResourcePoolPtr{pool});
+    return ResourcePoolPtr{pool};
 }
 
 void resource_pools_manager::delete_resource(resource_pool *pool) {

@@ -160,11 +160,11 @@ namespace AsyncRuntime::Dataflow {
 
         if (resource != nullptr) {
             auto source_port = make_shared_ptr<SourcePort<T>>(resource, notifier, name, typeid(T).hash_code(), buffer_type);
-            port_map.template insert(std::make_pair(name, source_port));
+            port_map.insert(std::make_pair(name, source_port));
             return source_port;
         } else {
             auto source_port = std::make_shared<SourcePort<T>>(notifier, name, typeid(T).hash_code(), buffer_type);
-            port_map.template insert(std::make_pair(name, source_port));
+            port_map.insert(std::make_pair(name, source_port));
             return source_port;
         }
     }
@@ -178,11 +178,11 @@ namespace AsyncRuntime::Dataflow {
 
         if (resource != nullptr) {
             auto source_port = make_shared_ptr<SourcePort<T>>(resource, notifier, name, typeid(T).hash_code(), buffer_type, std::forward<Arguments>(args)...);
-            port_map.template insert(std::make_pair(name, source_port));
+            port_map.insert(std::make_pair(name, source_port));
             return source_port;
         } else {
             auto source_port = std::make_shared<SourcePort<T>>(notifier, name, typeid(T).hash_code(), buffer_type, std::forward<Arguments>(args)...);
-            port_map.template insert(std::make_pair(name, source_port));
+            port_map.insert(std::make_pair(name, source_port));
             return source_port;
         }
     }

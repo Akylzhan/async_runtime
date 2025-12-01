@@ -81,19 +81,14 @@ file(GLOB SOURCES   src/*.cpp
                     src/dataflow/*.cpp)
 file(GLOB HEADERS include/${LIB_NAME}/*.hpp include/${LIB_NAME}/dataflow/*.hpp)
 
-include_directories(include/)
-include_directories(src/)
-include_directories(src/io)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${LibUV_INCLUDE_DIR})
-include_directories(third_party)
-
 add_library(${LIB_NAME} ${SOURCES})
 
-target_link_libraries(${LIB_NAME} pthread ${BOOST_LIBRARIES})
+target_include_directories(${LIB_NAME} PUBLIC include/ src/ src/io ${CMAKE_CURRENT_BINARY_DIR})
+
+target_link_libraries(${LIB_NAME} PUBLIC pthread ${BOOST_LIBRARIES})
 
 if (WITH_NUMA)
-    target_link_libraries(${LIB_NAME} numa)
+    target_link_libraries(${LIB_NAME} PUBLIC numa)
 endif()
 
 if (WITH_PROFILER)

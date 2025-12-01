@@ -1,8 +1,6 @@
 #ifndef AR_TRIPLE_BUFFER_H
 #define AR_TRIPLE_BUFFER_H
 
-#include <iostream>
-#include <map>
 #include <atomic>
 
 
@@ -14,9 +12,9 @@ namespace AsyncRuntime {
     template <typename T>
     class TripleBuffer {
     public:
-        TripleBuffer<T>();
-        TripleBuffer<T>(const TripleBuffer<T>&) = delete;
-        TripleBuffer<T>& operator=(const TripleBuffer<T>&) = delete;
+        TripleBuffer();
+        TripleBuffer(const TripleBuffer<T>&) = delete;
+        TripleBuffer& operator=(const TripleBuffer<T>&) = delete;
 
 
         /**

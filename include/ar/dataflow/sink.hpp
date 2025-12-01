@@ -162,8 +162,8 @@ namespace AsyncRuntime::Dataflow {
         Sink(Notifier *notifier = nullptr) : notifier(notifier) { };
         Sink(resource_pool *res, Notifier *notifier = nullptr)
         : notifier(notifier)
-        , resource(res)
-        , port_map(PortMapAllocator{res}) { };
+        , port_map(PortMapAllocator{res})
+        , resource(res) { };
 
         template<class T>
         std::shared_ptr<SinkPort<T>> Add( const std::string & port_name );
@@ -202,11 +202,11 @@ namespace AsyncRuntime::Dataflow {
 
         if ( resource != nullptr) {
             auto port = make_shared_ptr<SinkPort<T>>(resource, name, typeid(T).hash_code(), notifier);
-            port_map.template insert(std::make_pair(name, port));
+            port_map.insert(std::make_pair(name, port));
             return port;
         } else {
             auto port = std::make_shared<SinkPort<T>>(name, typeid(T).hash_code(), notifier);
-            port_map.template insert(std::make_pair(name, port));
+            port_map.insert(std::make_pair(name, port));
             return port;
         }
     }
@@ -220,11 +220,11 @@ namespace AsyncRuntime::Dataflow {
 
         if ( resource != nullptr) {
             auto port = make_shared_ptr<SinkPort<T>>(resource, name, typeid(T).hash_code(), notifier, deleter);
-            port_map.template insert(std::make_pair(name, port));
+            port_map.insert(std::make_pair(name, port));
             return port;
         } else {
             auto port = std::make_shared<SinkPort<T>>(name, typeid(T).hash_code(), notifier, deleter);
-            port_map.template insert(std::make_pair(name, port));
+            port_map.insert(std::make_pair(name, port));
             return port;
         }
     }

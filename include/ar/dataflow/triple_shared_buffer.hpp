@@ -11,8 +11,8 @@ namespace AsyncRuntime::Dataflow {
     public:
         explicit TripleBuffer();
 
-        TripleBuffer<T>(const TripleBuffer<T>&) = delete;
-        TripleBuffer<T>& operator=(const TripleBuffer<T>&) = delete;
+        TripleBuffer(const TripleBuffer<T>&) = delete;
+        TripleBuffer& operator=(const TripleBuffer<T>&) = delete;
 
         ~TripleBuffer() override = default;
         SharedBufferError Write( T && msg ) override;

@@ -6,8 +6,8 @@
 using namespace AsyncRuntime;
 
 Scheduler::Scheduler(const std::function<void(task *)> &task_callback)
-    : is_continue{true}
-    , task_callback(task_callback) {
+    : task_callback(task_callback)
+    , is_continue{true} {
     scheduler_th.Submit([this] { SchedulerLoop(); });
 }
 

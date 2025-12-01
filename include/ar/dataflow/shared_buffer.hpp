@@ -34,7 +34,7 @@ namespace AsyncRuntime::Dataflow {
         virtual bool Empty() =0;
         virtual void Flush() = 0;
         void SetSkipCounter(const std::shared_ptr<Mon::Counter> & counter) { skip_counter = counter; }
-        const SharedBufferType GetType() const { return type; }
+        SharedBufferType GetType() const { return type; }
     protected:
         std::shared_ptr<Mon::Counter> skip_counter;
     private:

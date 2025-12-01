@@ -169,7 +169,7 @@ std::vector<std::thread::id> ExecutorSlot::get_thread_ids() const {
     for (const auto &it : wids) {
         ids.emplace_back(it.first);
     }
-    return std::move(ids);
+    return ids;
 }
 
 void ExecutorSlot::post(task *task) {

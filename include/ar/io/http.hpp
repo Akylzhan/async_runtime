@@ -8,8 +8,6 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/streambuf.hpp>
 #include <cstdlib>
-#include <functional>
-#include <iostream>
 #include <memory>
 #include <string>
 
@@ -46,11 +44,11 @@ namespace AsyncRuntime::IO {
         friend class http_multipart_request_task;
     public:
         explicit http_session(boost::asio::io_service& io_service, int timeout = 0)
-                : resolver(net::make_strand(io_service))
+                : timeout(timeout)
+                , resolver(net::make_strand(io_service))
                 , stream(net::make_strand(io_service))
-                , timeout(timeout)
         {
-        };
+        }
 
         ~http_session();
 

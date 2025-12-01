@@ -53,7 +53,7 @@ std::vector<AsyncRuntime::CPU> AsyncRuntime::GetCPUs() {
         cpu.numa_node_id = _numa_node_of_cpu(i);
         cpus.push_back(cpu);
     }
-    return std::move(cpus);
+    return cpus;
 }
 
 
