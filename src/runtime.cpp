@@ -5,7 +5,6 @@
 #include "ar/resource_pool.hpp"
 #include "numbers.h"
 
-#include "io_executor.h"
 
 using namespace AsyncRuntime;
 
@@ -16,7 +15,7 @@ using namespace AsyncRuntime;
 
 Runtime *Runtime::g_runtime;
 
-Runtime::Runtime() : main_executor{nullptr}, io_executor{nullptr}, is_setup(false) {
+Runtime::Runtime() : main_executor{nullptr}, is_setup(false) {
 }
 
 Runtime::~Runtime() {
@@ -33,7 +32,6 @@ void Runtime::Setup(const RuntimeOptions &_options) {
 
     CreateDefaultExecutors(_options.virtual_numa_nodes_count);
     
-    io_executor = CreateExecutor<IO::IOExecutor>(IO_EXECUTOR_NAME);
 
     is_setup = true;
 
@@ -80,7 +78,6 @@ void Runtime::Terminate() {
 
 void Runtime::CheckRuntime() {
     assert(is_setup);
-    assert(io_executor != nullptr);
     assert(main_executor != nullptr);
 }
 

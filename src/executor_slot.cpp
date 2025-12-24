@@ -14,6 +14,7 @@ ExecutorSlot::ExecutorSlot(ObjectID _id,
         , threads{cpus.size()}
         , notifier{cpus.size()}
 {
+    std::cout << "creating executor slot " << name << " with cpu count " << cpus.size() << "\n";
     spawn(cpus);
 }
 

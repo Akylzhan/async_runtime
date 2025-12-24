@@ -59,7 +59,7 @@ std::vector<AsyncRuntime::CPU> AsyncRuntime::GetCPUs() {
 
 std::vector<AsyncRuntime::NumaNode> AsyncRuntime::GetNumaNodes() {
     std::vector<NumaNode> nodes(_get_numa_nodes_count());
-    for (int i = 0; i < std::thread::hardware_concurrency(); ++i) {
+    for (int i = 0; i < 1; ++i) {
         AsyncRuntime::CPU cpu = {};
         cpu.id = i;
         cpu.numa_node_id = _numa_node_of_cpu(i);

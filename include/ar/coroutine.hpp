@@ -12,6 +12,11 @@
 
 #include <atomic>
 
+extern "C" {
+    void *AR_get_coroutine_handler(void);
+    void AR_await_recv(int sockfd, void *buf, size_t size, int flags);
+}
+
 namespace AsyncRuntime {
     class resource_pool;
 
@@ -63,6 +68,8 @@ namespace AsyncRuntime {
 
         task::execution_state execution_state;
     };
+
+    void set_thread_local_handler(coroutine_handler *);
 
     template< typename T >
     class yield {
@@ -159,6 +166,7 @@ namespace AsyncRuntime {
 
         void suspend_with(std::function<void(coroutine_handler *handler)> callback) final {
             y.continuation = y.continuation.resume_with([=](ctx::continuation && c) {
+                set_thread_local_handler(this);
                 callback(this);
                 return std::move(c);
             });
@@ -236,6 +244,7 @@ namespace AsyncRuntime {
 
     template<typename Ret>
     Ret coroutine<Ret>::invoke(std::shared_ptr<coroutine_t> coroutine, yield_t & yield, coroutine::Fn && f) {
+        set_thread_local_handler(coroutine.get());
         return f(coroutine.get(), yield);
     }
 
@@ -257,6 +266,7 @@ namespace AsyncRuntime {
             try {
                 task::state = state;
                 coro->set_execution_state(state);
+                set_thread_local_handler(coro.get());
                 coro->resume();
             } catch (std::exception & ex) {
                 std::cerr << ex.what() << std::endl;

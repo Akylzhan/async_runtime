@@ -96,7 +96,6 @@ namespace AsyncRuntime {
 
         IExecutor *GetMainExecutor() { return main_executor; }
 
-        IExecutor *GetIOExecutor() { return io_executor; }
 
         template<typename ExecutorType>
         const ExecutorType *GetExecutor() const {
@@ -141,7 +140,6 @@ namespace AsyncRuntime {
         std::vector<WorkGroupOption> work_groups_option;
         std::map<size_t, IExecutor *> executors;
         IExecutor *main_executor;
-        IExecutor *io_executor;
         bool is_setup;
         std::shared_ptr<Mon::IMetricer> metricer;
         resource_pools_manager resources_manager;

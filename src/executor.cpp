@@ -28,11 +28,11 @@ ExecutorWorkGroup::ExecutorWorkGroup(int id,
                                      const WorkGroupOption & option,
                                      const std::vector<AsyncRuntime::CPU> &cpus,
                                      std::map<size_t, size_t>& cpus_wg) : id(id) {
-    int slot_concurrency = (option.slot_concurrency > 0)? option.slot_concurrency : std::thread::hardware_concurrency();
+    int slot_concurrency = 1;
     int max_cpus = (int) ((double) cpus.size() * (1.0 / (option.cap / option.util)));
-    max_cpus = std::min(std::max(1, max_cpus), (int)cpus.size());
+    max_cpus = 1;
     int slots_count = max_cpus/slot_concurrency;
-    slots_count = std::max(1, slots_count);
+    slots_count = 1;
     name = option.name;
 
     for (int i = 0; i < slots_count; ++i) {
@@ -145,6 +145,7 @@ Executor::Executor(const std::string &name_,
     for (int i = 0; i < cpus.size(); ++i) { cpus_wg[i] = 0; }
 
     for (int i = 0; i < work_groups_option.size(); ++i) {
+        std::cout << "creating work group " << name << " #" << i << " with cpu count " << cpus.size() << "\n";
         auto group = new ExecutorWorkGroup(i, work_groups_option[i], cpus, cpus_wg);
         for(const auto *slot : group->GetSlots()) {
             auto slot_thread_ids = slot->get_thread_ids();
