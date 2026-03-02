@@ -20,7 +20,6 @@ namespace AsyncRuntime {
 
     enum ExecutorType {
         kCPU_EXECUTOR,
-        kIO_EXECUTOR,
         kUSER_EXECUTOR
     };
 

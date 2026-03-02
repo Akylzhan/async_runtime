@@ -5,18 +5,15 @@
 #include "ar/resource_pool.hpp"
 #include "numbers.h"
 
-#include "io_executor.h"
-
 using namespace AsyncRuntime;
 
 #define MAX_GROUPS_COUNT 10
 #define MAIN_WORK_GROUP "main"
 #define MAIN_EXECUTOR_NAME "main"
-#define IO_EXECUTOR_NAME "io"
 
 Runtime *Runtime::g_runtime;
 
-Runtime::Runtime() : main_executor{nullptr}, io_executor{nullptr}, is_setup(false) {
+Runtime::Runtime() : main_executor{nullptr}, is_setup(false) {
 }
 
 Runtime::~Runtime() {
@@ -32,8 +29,6 @@ void Runtime::Setup(const RuntimeOptions &_options) {
         return;
 
     CreateDefaultExecutors(_options.virtual_numa_nodes_count);
-    
-    io_executor = CreateExecutor<IO::IOExecutor>(IO_EXECUTOR_NAME);
 
     is_setup = true;
 
@@ -80,7 +75,6 @@ void Runtime::Terminate() {
 
 void Runtime::CheckRuntime() {
     assert(is_setup);
-    assert(io_executor != nullptr);
     assert(main_executor != nullptr);
 }
 

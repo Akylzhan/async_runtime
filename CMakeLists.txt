@@ -7,7 +7,7 @@ project(${LIB_NAME} VERSION ${VERSION})
 
 option(WITH_TRACE "Build with tracing" OFF)
 option(WITH_TESTS "Build with tests" OFF)
-option(WITH_EXAMPLES "Build with examples" ON)
+option(WITH_EXAMPLES "Build with examples" OFF)
 option(WITH_DOCS "Build with docs" OFF)
 option(WITH_PROFILER "Build with profiler" OFF)
 option(WITH_BENCHMARKS "Build with benchmarks" OFF)
@@ -85,7 +85,7 @@ add_library(${LIB_NAME} ${SOURCES})
 
 target_include_directories(${LIB_NAME} PUBLIC include/ src/ src/io ${CMAKE_CURRENT_BINARY_DIR})
 
-target_link_libraries(${LIB_NAME} PUBLIC pthread ${BOOST_LIBRARIES})
+target_link_libraries(${LIB_NAME} PUBLIC pthread ${Boost_LIBRARIES})
 
 if (WITH_NUMA)
     target_link_libraries(${LIB_NAME} PUBLIC numa)
