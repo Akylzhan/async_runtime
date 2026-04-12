@@ -1,7 +1,6 @@
 #ifndef AR_DATAFLOW_KERNEL_H
 #define AR_DATAFLOW_KERNEL_H
 
-#include "ar/ar.hpp"
 #include "ar/dataflow/sink.hpp"
 #include "ar/dataflow/source.hpp"
 #include "ar/dataflow/notifier.hpp"
@@ -9,7 +8,13 @@
 #include "ar/dataflow/kernel_events.hpp"
 #include "ar/allocators.hpp"
 
+#include "tmc/aw_yield.hpp"
+#include "tmc/sync.hpp"
+#include "tmc/task.hpp"
+#include "tmc/ex_cpu.hpp"
+
 #include <config.hpp>
+#include <string>
 
 namespace AsyncRuntime::Dataflow {
 
@@ -76,16 +81,16 @@ namespace AsyncRuntime::Dataflow {
 
         virtual ~Kernel();
 
-        AsyncRuntime::future_t<int> AsyncInit();
+        tmc::task<int> AsyncInit();
 
         bool Run(const std::function<void(int)> &terminated_callback);
         bool Run();
 
-        AsyncRuntime::shared_future_t<int> AsyncTerminate();
+        tmc::task<int> AsyncTerminate();
 
-        void SetWorkGroup(AsyncRuntime::ObjectID wg) { coroutine->set_execution_state_wg(wg); }
+        void SetWorkGroup(AsyncRuntime::ObjectID wg) {  }
 
-        void SetEntityTag(AsyncRuntime::EntityTag tag) { coroutine->set_execution_state_tag(tag); }
+        void SetEntityTag(AsyncRuntime::EntityTag tag) {  }
 
         const std::string &GetName() const { return name; }
 
@@ -102,28 +107,31 @@ namespace AsyncRuntime::Dataflow {
         std::shared_ptr<SinkPort<T>> GetSinkPort( const std::string & name ) { return sink.template At<T>(name); }
 #if defined(MEASURE_CPU_TIME)
         size_t GetCpuTime() {
-            return coroutine->get_cpu_time();
+            // TODO:
+            // return coroutine->get_cpu_time();
+            return 0;
         }
 #endif
 
     protected:
-        virtual int OnInit(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) = 0;
+        virtual tmc::task<int> OnInit(KernelContextT *context) = 0;
 
-        virtual KernelProcessResult OnProcess(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) = 0;
+        virtual tmc::task<KernelProcessResult> OnProcess(KernelContextT *context) = 0;
 
-        virtual KernelProcessResult OnSinkSubscription(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context);
+        virtual tmc::task<KernelProcessResult> OnSinkSubscription(KernelContextT *context);
 
-        virtual KernelProcessResult OnWaitSinkSubscription(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context);
+        virtual tmc::task<KernelProcessResult> OnWaitSinkSubscription(KernelContextT *context);
 
-        virtual KernelProcessResult OnSinkUnsubscription(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context);
+        virtual tmc::task<KernelProcessResult> OnSinkUnsubscription(KernelContextT *context);
 
-        virtual KernelProcessResult OnTerminate(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context);
+        virtual tmc::task<KernelProcessResult> OnTerminate(KernelContextT *context);
 
-        virtual KernelProcessResult OnUpdate(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context);
+        virtual tmc::task<KernelProcessResult> OnUpdate(KernelContextT *context);
 
-        virtual void OnDispose(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) { };
+        virtual void OnDispose(KernelContextT *context) { };
 
-        static int AsyncLoop(AsyncRuntime::CoroutineHandler *handler, yield<int> &yield, Kernel<KernelContextT>* kernel);
+        tmc::task<int> AsyncLoop(const std::function<void(int)> &terminated_callback);
+        tmc::task<int> AsyncLoopBody();
 
         Source source;
         Sink sink;
@@ -132,8 +140,10 @@ namespace AsyncRuntime::Dataflow {
     private:
         std::atomic<KernelState> state;
         std::string name;
-        shared_future_t<int> future_res;
-        std::shared_ptr<AsyncRuntime::coroutine<int>> coroutine;
+        std::future<int> loop_future;
+        std::unique_ptr<KernelContextT> kernel_context{nullptr};
+        //shared_future_t<int> future_res;
+        //std::shared_ptr<AsyncRuntime::coroutine<int>> coroutine;
     };
 
     template<class KernelContextT>
@@ -160,71 +170,58 @@ namespace AsyncRuntime::Dataflow {
     }
 
     template<class KernelContextT>
-    int Kernel<KernelContextT>::AsyncLoop(AsyncRuntime::CoroutineHandler *handler,
-                                          yield<int> &yield,
-                                          Kernel<KernelContextT>* kernel) {
-        KernelContextT context;
-        context.SetResource(kernel->resource);
-        try {
-            int init_error = kernel->OnInit(handler, &context);
-            if (init_error != 0) {
-                kernel->OnDispose(handler, &context);
-                kernel->state.store(kTERMINATED, std::memory_order_relaxed);
-                return init_error;
-            } else {
-                kernel->state.store(kINITIALIZED, std::memory_order_relaxed);
-            }
+    tmc::task<int> Kernel<KernelContextT>::AsyncLoop(const std::function<void(int)> &terminated_callback) {
+        auto result = co_await AsyncLoopBody();
+        if (terminated_callback) {
+            terminated_callback(result);
+        }
+        co_return result;
+    }
 
-            yield(init_error);
-            if (kernel->state.load(std::memory_order_relaxed) != kTERMINATED) {
-                kernel->state.store(kRUNNING, std::memory_order_relaxed);
+    template<class KernelContextT>
+    tmc::task<int> Kernel<KernelContextT>::AsyncLoopBody() {
+        try {
+            if (state.load(std::memory_order_relaxed) != kTERMINATED) {
+                state.store(kRUNNING, std::memory_order_relaxed);
 
                 auto res = kNEXT;
-                while (res == kNEXT && kernel->state.load(std::memory_order_relaxed) != kTERMINATED) {
-                    res = kernel->OnUpdate(handler, &context);
+                while (res == kNEXT) {
+                    co_await tmc::reschedule();
+                    if (state.load(std::memory_order_relaxed) == kTERMINATED) {
+                        break;
+                    }
+                    res = co_await OnUpdate(kernel_context.get());
                 }
             }
 
-            kernel->state.store(kTERMINATED, std::memory_order_relaxed);
-            kernel->OnDispose(handler, &context);
+            state.store(kTERMINATED, std::memory_order_relaxed);
+            OnDispose(kernel_context.get());
         } catch (std::exception & ex) {
             std::cerr << ex.what() << std::endl;
-            kernel->state.store(kTERMINATED, std::memory_order_relaxed);
-            kernel->OnDispose(handler, &context);
-            return -1;
+            state.store(kTERMINATED, std::memory_order_relaxed);
+            OnDispose(kernel_context.get());
+            co_return -1;
         }
 
-        return context.GetErrorCode();
+        co_return kernel_context->GetErrorCode();
     }
 
     template<class KernelContextT>
-    AsyncRuntime::future_t<int> Kernel<KernelContextT>::AsyncInit() {
+    tmc::task<int> Kernel<KernelContextT>::AsyncInit() {
         try {
-            if (resource != nullptr) {
-                coroutine = make_coroutine<int>(resource, &Kernel<KernelContextT>::AsyncLoop, this);
-            }else{
-                coroutine = make_coroutine<int>(&Kernel<KernelContextT>::AsyncLoop, this);
+            kernel_context = std::make_unique<KernelContextT>();
+            kernel_context->SetResource(resource);
+            int init_error = co_await OnInit(kernel_context.get());
+            if (init_error != 0) {
+                OnDispose(kernel_context.get());
+                state.store(kTERMINATED, std::memory_order_relaxed);
+                co_return init_error;
+            } else {
+                state.store(kINITIALIZED, std::memory_order_relaxed);
             }
-            state.store(kREADY, std::memory_order_relaxed);
-            return AsyncRuntime::Async(coroutine);
+            co_return init_error;
         } catch (...) {
-            return make_resolved_future(-1);
-        }
-    }
-
-    template<class KernelContextT>
-    bool Kernel<KernelContextT>::Run() {
-        if (state.load(std::memory_order_relaxed) != kINITIALIZED) {
-            return false;
-        }
-
-        if (coroutine && !coroutine->is_completed()) {
-            state.store(kRUNNING, std::memory_order_relaxed);
-            auto f = AsyncRuntime::Async(coroutine);
-            future_res = f.share();
-            return true;
-        } else {
-            return false;
+            co_return -1;
         }
     }
 
@@ -233,140 +230,124 @@ namespace AsyncRuntime::Dataflow {
         if (state.load(std::memory_order_relaxed) != kINITIALIZED) {
             return false;
         }
-        if (coroutine && !coroutine->is_completed()) {
-            state.store(kRUNNING, std::memory_order_relaxed);
-            auto f = AsyncRuntime::Async(coroutine);
-            future_res = f.share();
 
-            if (terminated_callback) {
-                future_res.then(boost::launch::sync, [terminated_callback](boost::shared_future<int> f) {
-                    int res = f.get();
-                    if (terminated_callback) {
-                        terminated_callback(res);
-                    }
-                    return res;
-                });
-            }
-            return true;
-        } else {
-            return false;
-        }
+        state.store(kRUNNING, std::memory_order_relaxed);
+        loop_future = tmc::post_waitable(tmc::cpu_executor(), AsyncLoop(terminated_callback));
+
+        return true;
     }
 
     template<class KernelContextT>
-    AsyncRuntime::shared_future_t<int> Kernel<KernelContextT>::AsyncTerminate() {
-        if (state.load(std::memory_order_relaxed) == kRUNNING) {
-            state.store(kTERMINATED, std::memory_order_relaxed);
+    tmc::task<int> Kernel<KernelContextT>::AsyncTerminate() {
+        if (loop_future.valid()) {
             process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
-            return future_res;
+            state.store(kTERMINATED, std::memory_order_relaxed);
+            co_return loop_future.get();
         } else if (state.load(std::memory_order_relaxed) == kINITIALIZED) {
             state.store(kTERMINATED, std::memory_order_relaxed);
             process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
-            auto f = AsyncRuntime::Async(coroutine);
-            future_res = f.share();
-            return future_res;
+            co_return 0;
         } else {
             state.store(kTERMINATED, std::memory_order_relaxed);
-            return make_resolved_future(0);
+            process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
+            co_return 0;
         }
     }
 
     template<class KernelContextT>
-    KernelProcessResult
-    Kernel<KernelContextT>::OnUpdate(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) {
+    tmc::task<KernelProcessResult>
+    Kernel<KernelContextT>::OnUpdate(KernelContextT *context) {
         KernelProcessResult res = kNEXT;
         if (sink.SubscribersEmpty()) {
-            res = OnWaitSinkSubscription(handler, context);
+            res = co_await OnWaitSinkSubscription(context);
             if (res != kNEXT) {
-                return res;
+                co_return res;
             }
         }
-
-        int events = AsyncRuntime::Await(process_notifier.AsyncWatchAny(), handler);
+        int events = co_await process_notifier.AsyncWatchAny();
 
         if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_READ_SOURCE)) {
-            res = OnProcess(handler, context);
+            res = co_await OnProcess(context);
             if (res != kNEXT) {
-                return res;
+                co_return res;
             }
         }
 
         if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)) {
-            res = OnTerminate(handler, context);
+            res = co_await OnTerminate(context);
             if (res != kNEXT) {
-                return res;
+                co_return res;
             }
         }
 
         if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_SINK_SUBSCRIPTION)) {
-            res = OnSinkSubscription(handler, context);
+            res = co_await OnSinkSubscription(context);
             if (res != kNEXT) {
-                return res;
+                co_return res;
             }
         }
 
         if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_SINK_UNSUBSCRIPTION)) {
-            res = OnSinkUnsubscription(handler, context);
+            res = co_await OnSinkUnsubscription(context);
             if (res != kNEXT) {
-                return res;
+                co_return res;
             }
         }
 
-        return res;
+        co_return res;
     }
 
     template<class KernelContextT>
-    KernelProcessResult
-    Kernel<KernelContextT>::OnTerminate(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) {
+    tmc::task<KernelProcessResult>
+    Kernel<KernelContextT>::OnTerminate(KernelContextT *context) {
         source.Deactivate();
         source.Flush();
         sink.UnsubscribeAll();
-        return kEND;
+        co_return kEND;
     }
 
     template<class KernelContextT>
-    KernelProcessResult
-    Kernel<KernelContextT>::OnSinkSubscription(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) {
+    tmc::task<KernelProcessResult>
+    Kernel<KernelContextT>::OnSinkSubscription(KernelContextT *context) {
         source.Activate();
-        return kNEXT;
+        co_return kNEXT;
     }
 
     template<class KernelContextT>
-    KernelProcessResult
-    Kernel<KernelContextT>::OnSinkUnsubscription(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) {
+    tmc::task<KernelProcessResult>
+    Kernel<KernelContextT>::OnSinkUnsubscription(KernelContextT *context) {
         KernelProcessResult res = kNEXT;
         if (sink.SubscribersEmpty()) {
-            res = OnWaitSinkSubscription(handler, context);
+            res = co_await OnWaitSinkSubscription(context);
         }
 
-        return res;
+        co_return res;
     }
 
     template<class KernelContextT>
-    KernelProcessResult
-    Kernel<KernelContextT>::OnWaitSinkSubscription(AsyncRuntime::CoroutineHandler *handler, KernelContextT *context) {
+    tmc::task<KernelProcessResult>
+    Kernel<KernelContextT>::OnWaitSinkSubscription(KernelContextT *context) {
         source.Flush();
         source.Deactivate();
 
         KernelProcessResult res = kNEXT;
-        int events = AsyncRuntime::Await(process_notifier.AsyncWatch(KernelEvent::kKERNEL_EVENT_SINK_SUBSCRIPTION, KernelEvent::kKERNEL_EVENT_TERMINATE), handler);
-
+        int events = co_await process_notifier.AsyncWatch(KernelEvent::kKERNEL_EVENT_SINK_SUBSCRIPTION, KernelEvent::kKERNEL_EVENT_TERMINATE);
         if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)) {
-            res = OnTerminate(handler, context);
+            res = co_await OnTerminate(context);
             if (res != kNEXT) {
-                return res;
+                co_return res;
             }
         }
 
         if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_SINK_SUBSCRIPTION)) {
-            res = OnSinkSubscription(handler, context);
+            res = co_await OnSinkSubscription(context);
             source.Flush();
             if (res != kNEXT) {
-                return res;
+                co_return res;
             }
         }
 
-        return res;
+        co_return res;
     }
 }
 

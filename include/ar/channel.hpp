@@ -2,10 +2,12 @@
 #define AR_CHANNEL_H
 
 
-#include "ar/task.hpp"
 #include "ar/object.hpp"
 #include "ar/resource_pool.hpp"
 #include "ar/allocators.hpp"
+
+#include <tmc/atomic_condvar.hpp>
+#include <tmc/task.hpp>
 
 #include <cstring>
 #include <queue>
@@ -32,14 +34,13 @@ namespace AsyncRuntime {
         ~Watcher() override = default;
 
         std::optional<T> TryReceive();
-        future_t<void>   AsyncWait();
+        tmc::task<void>   AsyncWait();
     private:
         void Send(const T& msg);
 
         std::queue<T>                                   queue;
         std::mutex                                      mutex;
-        promise_t<void>                                 promise;
-        bool                                            resolved = false;
+        tmc::atomic_condvar<size_t>                     notifier{0};
     };
 
 
@@ -117,10 +118,8 @@ namespace AsyncRuntime {
     void Watcher<T>::Send(const T& msg) {
         std::lock_guard<std::mutex>  lock(mutex);
         queue.push(msg);
-        if (!resolved) {
-            promise.set_value();
-            resolved = true;
-        }
+        notifier.ref() = queue.size();
+        notifier.notify_one();
     }
 
 
@@ -130,6 +129,7 @@ namespace AsyncRuntime {
         if (!queue.empty()) {
             T v = queue.front();
             queue.pop();
+            notifier.ref() = queue.size();
             return v;
         } else {
             return std::nullopt;
@@ -138,17 +138,14 @@ namespace AsyncRuntime {
 
 
     template<typename T>
-    future_t<void> Watcher<T>::AsyncWait() {
-        std::lock_guard<std::mutex>  lock(mutex);
-        if (queue.empty()) {
-            resolved = false;
-            promise = {};
-            return promise.get_future();
-        } else {
-            resolved = false;
-            promise = {};
-            return make_resolved_future();
+    tmc::task<void> Watcher<T>::AsyncWait() {
+        {
+            std::lock_guard<std::mutex>  lock(mutex);
+            if (!queue.empty()) {
+                co_return;
+            }
         }
+        co_await notifier.await(0);
     }
 }
 

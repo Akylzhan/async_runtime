@@ -158,7 +158,7 @@ namespace AsyncRuntime {
         }
 
         void suspend_with(std::function<void(coroutine_handler *handler)> callback) final {
-            y.continuation = y.continuation.resume_with([=](ctx::continuation && c) {
+            y.continuation = y.continuation.resume_with([=, this](ctx::continuation && c) {
                 callback(this);
                 return std::move(c);
             });

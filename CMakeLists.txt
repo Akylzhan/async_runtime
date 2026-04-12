@@ -50,7 +50,7 @@ if (MEASURE_CPU_TIME)
     set(MEASURE_CPU_TIME ON)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -65,6 +65,10 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 configure_file(version.in ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 
 include(cmake/boost.cmake)
+
+add_library(TooManyCooks ${CMAKE_CURRENT_SOURCE_DIR}/third_party/TooManyCooks.cpp)
+target_include_directories(TooManyCooks PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/TooManyCooks/include)
+target_compile_definitions(TooManyCooks PUBLIC TMC_USE_BOOST_ASIO TMC_MORE_THREADS)
 
 if (WITH_TRACE)
     include(cmake/trace.cmake)
@@ -85,7 +89,7 @@ add_library(${LIB_NAME} ${SOURCES})
 
 target_include_directories(${LIB_NAME} PUBLIC include/ src/ src/io ${CMAKE_CURRENT_BINARY_DIR})
 
-target_link_libraries(${LIB_NAME} PUBLIC pthread ${Boost_LIBRARIES})
+target_link_libraries(${LIB_NAME} PUBLIC pthread ${Boost_LIBRARIES} TooManyCooks)
 
 if (WITH_NUMA)
     target_link_libraries(${LIB_NAME} PUBLIC numa)
