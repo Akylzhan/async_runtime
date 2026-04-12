@@ -84,7 +84,6 @@ namespace AsyncRuntime::Dataflow {
         tmc::task<int> AsyncInit();
 
         bool Run(const std::function<void(int)> &terminated_callback);
-        bool Run();
 
         tmc::task<int> AsyncTerminate();
 
@@ -130,7 +129,7 @@ namespace AsyncRuntime::Dataflow {
 
         virtual void OnDispose(KernelContextT *context) { };
 
-        tmc::task<int> AsyncLoop(const std::function<void(int)> &terminated_callback);
+        tmc::task<int> AsyncLoop(std::function<void(int)> terminated_callback);
         tmc::task<int> AsyncLoopBody();
 
         Source source;
@@ -170,7 +169,7 @@ namespace AsyncRuntime::Dataflow {
     }
 
     template<class KernelContextT>
-    tmc::task<int> Kernel<KernelContextT>::AsyncLoop(const std::function<void(int)> &terminated_callback) {
+    tmc::task<int> Kernel<KernelContextT>::AsyncLoop(std::function<void(int)> terminated_callback) {
         auto result = co_await AsyncLoopBody();
         if (terminated_callback) {
             terminated_callback(result);
