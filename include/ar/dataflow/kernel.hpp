@@ -114,6 +114,10 @@ namespace AsyncRuntime::Dataflow {
 #endif
 
     protected:
+        virtual tmc::ex_cpu &GetExecutor() const {
+            return tmc::cpu_executor();
+        }
+
         virtual tmc::task<int> OnInit(KernelContextT *context) = 0;
 
         virtual tmc::task<KernelProcessResult> OnProcess(KernelContextT *context) = 0;
@@ -232,7 +236,7 @@ namespace AsyncRuntime::Dataflow {
         }
 
         state.store(kRUNNING, std::memory_order_relaxed);
-        loop_future = tmc::post_waitable(tmc::cpu_executor(), AsyncLoop(terminated_callback));
+        loop_future = tmc::post_waitable(GetExecutor(), AsyncLoop(terminated_callback));
 
         return true;
     }
