@@ -13,6 +13,7 @@
 #include "tmc/task.hpp"
 #include "tmc/ex_cpu.hpp"
 
+#include <atomic>
 #include <config.hpp>
 #include <string>
 
@@ -136,8 +137,8 @@ namespace AsyncRuntime::Dataflow {
         Sink sink;
         Notifier process_notifier;
         resource_pool *resource = nullptr;
+        std::atomic<KernelState> state{};
     private:
-        std::atomic<KernelState> state;
         std::string name;
         std::future<int> loop_future;
         std::unique_ptr<KernelContextT> kernel_context{nullptr};
@@ -272,7 +273,8 @@ namespace AsyncRuntime::Dataflow {
             }
         }
 
-        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)) {
+        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)
+            || state.load(std::memory_order_relaxed) == kTERMINATED) {
             res = co_await OnTerminate(context);
             if (res != kNEXT) {
                 co_return res;
@@ -331,7 +333,8 @@ namespace AsyncRuntime::Dataflow {
 
         KernelProcessResult res = kNEXT;
         int events = co_await process_notifier.AsyncWatch(KernelEvent::kKERNEL_EVENT_SINK_SUBSCRIPTION, KernelEvent::kKERNEL_EVENT_TERMINATE);
-        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)) {
+        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)
+            || state.load(std::memory_order_relaxed) == kTERMINATED) {
             res = co_await OnTerminate(context);
             if (res != kNEXT) {
                 co_return res;
