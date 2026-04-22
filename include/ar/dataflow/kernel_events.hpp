@@ -10,11 +10,11 @@ namespace AsyncRuntime::Dataflow {
      */
     enum class KernelEvent
     {
-        kKERNEL_EVENT_ANY                       = 1 << 1, // 1
-        kKERNEL_EVENT_READ_SOURCE               = 1 << 1, // 1
-        kKERNEL_EVENT_TERMINATE                 = 1 << 2, // 2
-        kKERNEL_EVENT_SINK_SUBSCRIPTION         = 1 << 3, // 4
-        kKERNEL_EVENT_SINK_UNSUBSCRIPTION       = 1 << 4, // 8
+        kKERNEL_EVENT_ANY                       = 1 << 1, // 2
+        kKERNEL_EVENT_READ_SOURCE               = 1 << 1, // 2
+        kKERNEL_EVENT_TERMINATE                 = 1 << 2, // 4
+        kKERNEL_EVENT_SINK_SUBSCRIPTION         = 1 << 3, // 8
+        kKERNEL_EVENT_SINK_UNSUBSCRIPTION       = 1 << 4, // 16
 //        Flag5 = 1 << 4, // 16
 //        Flag6 = 1 << 5, // 32
 //        Flag7 = 1 << 6, // 64

@@ -186,11 +186,9 @@ namespace AsyncRuntime::Dataflow {
     tmc::task<int> Kernel<KernelContextT>::AsyncLoopBody() {
         try {
             if (state.load(std::memory_order_relaxed) != kTERMINATED) {
-                state.store(kRUNNING, std::memory_order_relaxed);
-
                 auto res = kNEXT;
                 while (res == kNEXT) {
-                    co_await tmc::reschedule();
+                    // co_await tmc::reschedule();
                     if (state.load(std::memory_order_relaxed) == kTERMINATED) {
                         break;
                     }
@@ -243,17 +241,11 @@ namespace AsyncRuntime::Dataflow {
 
     template<class KernelContextT>
     tmc::task<int> Kernel<KernelContextT>::AsyncTerminate() {
+        state.store(kTERMINATED, std::memory_order_relaxed);
+        process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
         if (loop_future.valid()) {
-            process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
-            state.store(kTERMINATED, std::memory_order_relaxed);
             co_return loop_future.get();
-        } else if (state.load(std::memory_order_relaxed) == kINITIALIZED) {
-            state.store(kTERMINATED, std::memory_order_relaxed);
-            process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
-            co_return 0;
         } else {
-            state.store(kTERMINATED, std::memory_order_relaxed);
-            process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
             co_return 0;
         }
     }
@@ -270,16 +262,16 @@ namespace AsyncRuntime::Dataflow {
         }
         int events = co_await process_notifier.AsyncWatchAny();
 
-        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_READ_SOURCE)) {
-            res = co_await OnProcess(context);
+        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)
+            || state.load(std::memory_order_relaxed) == kTERMINATED) {
+            res = co_await OnTerminate(context);
             if (res != kNEXT) {
                 co_return res;
             }
         }
 
-        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_TERMINATE)
-            || state.load(std::memory_order_relaxed) == kTERMINATED) {
-            res = co_await OnTerminate(context);
+        if (Dataflow::Notifier::HasState(events, KernelEvent::kKERNEL_EVENT_READ_SOURCE)) {
+            res = co_await OnProcess(context);
             if (res != kNEXT) {
                 co_return res;
             }
