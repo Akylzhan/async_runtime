@@ -16,6 +16,7 @@
 #include <atomic>
 #include <config.hpp>
 #include <string>
+#include <tmc/semaphore.hpp>
 
 namespace AsyncRuntime::Dataflow {
 
@@ -144,6 +145,7 @@ namespace AsyncRuntime::Dataflow {
         std::atomic<KernelState> state{};
     private:
         std::string name;
+        tmc::semaphore loop_semaphore{0};
         std::future<int> loop_future;
         std::unique_ptr<KernelContextT> kernel_context{nullptr};
         //shared_future_t<int> future_res;
@@ -179,6 +181,7 @@ namespace AsyncRuntime::Dataflow {
         if (terminated_callback) {
             terminated_callback(result);
         }
+        loop_semaphore.release();
         co_return result;
     }
 
@@ -244,6 +247,7 @@ namespace AsyncRuntime::Dataflow {
         state.store(kTERMINATED, std::memory_order_relaxed);
         process_notifier.Notify((int) KernelEvent::kKERNEL_EVENT_TERMINATE);
         if (loop_future.valid()) {
+            co_await loop_semaphore;
             co_return loop_future.get();
         } else {
             co_return 0;
