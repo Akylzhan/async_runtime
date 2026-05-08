@@ -4,7 +4,7 @@
 
 #include "ar/object.hpp"
 
-#include <tmc/atomic_condvar.hpp>
+#include <tmc/semaphore.hpp>
 #include <tmc/task.hpp>
 
 #include <map>
@@ -40,7 +40,7 @@ namespace AsyncRuntime {
 
         std::queue<T>                                   queue;
         std::mutex                                      mutex;
-        tmc::atomic_condvar<size_t>                     notifier{0};
+        tmc::semaphore                                  semaphore{0};
     };
 
 
@@ -103,8 +103,7 @@ namespace AsyncRuntime {
     void Watcher<T>::Send(const T& msg) {
         std::lock_guard<std::mutex>  lock(mutex);
         queue.push(msg);
-        notifier.ref() = queue.size();
-        notifier.notify_one();
+        semaphore.release();
     }
 
 
@@ -114,7 +113,6 @@ namespace AsyncRuntime {
         if (!queue.empty()) {
             T v = queue.front();
             queue.pop();
-            notifier.ref() = queue.size();
             return v;
         } else {
             return std::nullopt;
@@ -124,13 +122,7 @@ namespace AsyncRuntime {
 
     template<typename T>
     tmc::task<void> Watcher<T>::AsyncWait() {
-        {
-            std::lock_guard<std::mutex>  lock(mutex);
-            if (!queue.empty()) {
-                co_return;
-            }
-        }
-        co_await notifier.await(0);
+        co_await semaphore;
     }
 }
 
