@@ -3,12 +3,12 @@
 
 
 #include "ar/object.hpp"
-#include "ar/resource_pool.hpp"
-#include "ar/allocators.hpp"
 
 #include <tmc/atomic_condvar.hpp>
 #include <tmc/task.hpp>
 
+#include <map>
+#include <memory>
 #include <cstring>
 #include <queue>
 
@@ -51,8 +51,7 @@ namespace AsyncRuntime {
         friend CHANNEL_TEST_FRIEND;
 #endif
     public:
-        Channel() = default;
-        explicit Channel(resource_pool *resource);
+        explicit Channel() = default;
 
         typedef Watcher<T>  WatcherType;
 
@@ -60,16 +59,11 @@ namespace AsyncRuntime {
 
         std::shared_ptr<WatcherType> Watch();
 
-        std::shared_ptr<WatcherType> Watch(resource_pool *resource);
-
         void UnWatch(const std::shared_ptr<WatcherType>& watcher);
     private:
         std::mutex                                             mutex;
-        map<ObjectID, std::shared_ptr<WatcherType>>            watchers;
+        std::map<ObjectID, std::shared_ptr<WatcherType>>            watchers;
     };
-
-    template<typename T>
-    Channel<T>::Channel(resource_pool *resource) : watchers(resource) { }
 
     template<typename T>
     std::shared_ptr<Watcher<T>> Channel<T>::Watch() {
@@ -78,15 +72,6 @@ namespace AsyncRuntime {
         watchers.insert(std::make_pair(watcher->GetID(), watcher));
         return watcher;
     }
-
-    template<typename T>
-    std::shared_ptr<Watcher<T>> Channel<T>::Watch(resource_pool *resource) {
-        std::lock_guard<std::mutex> lock(mutex);
-        auto watcher = make_shared_ptr<Watcher<T>>(resource);
-        watchers.insert(std::make_pair(watcher->GetID(), watcher));
-        return watcher;
-    }
-
 
     template<typename T>
     void Channel<T>::UnWatch(const std::shared_ptr<WatcherType> &watcher) {

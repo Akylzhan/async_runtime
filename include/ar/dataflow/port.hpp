@@ -1,9 +1,9 @@
 #ifndef AR_DATAFLOW_PORT_H
 #define AR_DATAFLOW_PORT_H
 
-#include "ar/ar.hpp"
-#include <typeinfo>
+#include <atomic>
 #include <set>
+#include <string>
 
 namespace AsyncRuntime::Dataflow {
     /**
@@ -18,10 +18,9 @@ namespace AsyncRuntime::Dataflow {
      * @brief
      */
     class Port {
-        using PortSet = std::set<const PortUser*, std::less<const PortUser*>, Allocator<const PortUser*>>;
+        using PortSet = std::set<const PortUser*, std::less<const PortUser*>>;
     public:
         Port(const std::string & name, size_t data_type);
-        Port(resource_pool *resource, const std::string & name, size_t data_type);
         virtual ~Port() = default;
 
         const std::string & GetName() const { return name; }

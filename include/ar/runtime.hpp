@@ -4,7 +4,6 @@
 #include "ar/coroutine.hpp"
 #include "ar/executor.hpp"
 #include "ar/metricer.hpp"
-#include "ar/resource_pool.hpp"
 
 namespace AsyncRuntime {
     class Ticker;
@@ -43,12 +42,6 @@ namespace AsyncRuntime {
 
         template<class CounterT>
         void CreateMetricer(const std::map<std::string, std::string> &labels);
-
-        ResourcePoolPtr CreateResource(size_t chunk_sz = 128, size_t nnext_size = 1024, size_t nmax_size = 0);
-
-        void DeleteResource(resource_pool *pool);
-
-        resource_pool *GetDefaultResource();
 
         void Setup(const RuntimeOptions &options = {});
 
@@ -141,7 +134,6 @@ namespace AsyncRuntime {
         IExecutor *main_executor;
         bool is_setup;
         std::shared_ptr<Mon::IMetricer> metricer;
-        resource_pools_manager resources_manager;
     };
 
     template<class Callable, class... Arguments>
@@ -393,14 +385,6 @@ namespace AsyncRuntime {
     template<typename Rep, typename Period>
     inline future_t<void> AsyncSleep(const std::chrono::duration<Rep, Period> &rtime) {
         return Runtime::g_runtime->AsyncSleep<Rep, Period>(rtime);
-    }
-
-    /**
-     * @brief
-     * @return
-     */
-    inline resource_pool * GetDefaultResource() {
-        return Runtime::g_runtime->GetDefaultResource();
     }
 }
 

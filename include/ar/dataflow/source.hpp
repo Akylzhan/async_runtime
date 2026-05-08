@@ -116,14 +116,9 @@ namespace AsyncRuntime::Dataflow {
      */
     class Source {
         using iterator = std::unordered_map<std::string, std::shared_ptr<Port>>::iterator;
-        using PortMapAllocator = Allocator<std::pair<const std::string, std::shared_ptr<Port>>>;
-        using PortMap = std::unordered_map<std::string, std::shared_ptr<Port>, std::hash<std::string>, std::equal_to<std::string>, PortMapAllocator>;
+        using PortMap = std::unordered_map<std::string, std::shared_ptr<Port>, std::hash<std::string>, std::equal_to<std::string>>;
     public:
-        explicit Source(Notifier *notifier = nullptr) : notifier(notifier) { };
-        Source(resource_pool *res, Notifier *notifier = nullptr)
-        : notifier(notifier)
-        , resource(res)
-        , port_map(PortMapAllocator{res}) { };
+        explicit Source(Notifier *notifier = nullptr) : notifier(notifier) { }
 
         template<class T>
         std::shared_ptr<SourcePort<T>> Add( const std::string & port_name, SharedBufferType buffer_type = kFIFO_BUFFER );
@@ -147,7 +142,6 @@ namespace AsyncRuntime::Dataflow {
     private:
         std::mutex mutex;
         Notifier *notifier;
-        resource_pool *resource = nullptr;
         PortMap port_map;
     };
 
@@ -158,15 +152,9 @@ namespace AsyncRuntime::Dataflow {
             throw std::runtime_error("Source port already exists");
         }
 
-        if (resource != nullptr) {
-            auto source_port = make_shared_ptr<SourcePort<T>>(resource, notifier, name, typeid(T).hash_code(), buffer_type);
-            port_map.insert(std::make_pair(name, source_port));
-            return source_port;
-        } else {
-            auto source_port = std::make_shared<SourcePort<T>>(notifier, name, typeid(T).hash_code(), buffer_type);
-            port_map.insert(std::make_pair(name, source_port));
-            return source_port;
-        }
+        auto source_port = std::make_shared<SourcePort<T>>(notifier, name, typeid(T).hash_code(), buffer_type);
+        port_map.insert(std::make_pair(name, source_port));
+        return source_port;
     }
 
     template<class T, class... Arguments>
@@ -176,15 +164,9 @@ namespace AsyncRuntime::Dataflow {
             throw std::runtime_error("Source port already exists");
         }
 
-        if (resource != nullptr) {
-            auto source_port = make_shared_ptr<SourcePort<T>>(resource, notifier, name, typeid(T).hash_code(), buffer_type, std::forward<Arguments>(args)...);
-            port_map.insert(std::make_pair(name, source_port));
-            return source_port;
-        } else {
-            auto source_port = std::make_shared<SourcePort<T>>(notifier, name, typeid(T).hash_code(), buffer_type, std::forward<Arguments>(args)...);
-            port_map.insert(std::make_pair(name, source_port));
-            return source_port;
-        }
+        auto source_port = std::make_shared<SourcePort<T>>(notifier, name, typeid(T).hash_code(), buffer_type, std::forward<Arguments>(args)...);
+        port_map.insert(std::make_pair(name, source_port));
+        return source_port;
     }
 
     template<class T>

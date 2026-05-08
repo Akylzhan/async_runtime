@@ -2,7 +2,6 @@
 #include "ar/logger.hpp"
 #include "ar/profiler.hpp"
 #include "ar/cpu_helper.hpp"
-#include "ar/resource_pool.hpp"
 #include "numbers.h"
 
 using namespace AsyncRuntime;
@@ -105,18 +104,6 @@ void Runtime::CreateDefaultExecutors(int virtual_numa_nodes_count) {
     if (main_executor == nullptr) {
         throw std::runtime_error("main executor not setup");
     }
-}
-
-ResourcePoolPtr Runtime::CreateResource(size_t chunk_sz, size_t nnext_size, size_t nmax_size) {
-   return resources_manager.create_resource(chunk_sz, nnext_size, nmax_size);
-}
-
-void Runtime::DeleteResource(resource_pool *pool) {
-    resources_manager.delete_resource(pool);
-}
-
-resource_pool * Runtime::GetDefaultResource() {
-    return resources_manager.get_default_resource();
 }
 
 EntityTag Runtime::AddEntityTag(void *ptr) {

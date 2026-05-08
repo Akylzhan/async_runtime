@@ -4,7 +4,6 @@
 #include "ar/task.hpp"
 #include "ar/stack.hpp"
 #include "ar/pooled_stack.hpp"
-#include "ar/allocators.hpp"
 
 #include <config.hpp>
 
@@ -13,7 +12,6 @@
 #include <atomic>
 
 namespace AsyncRuntime {
-    class resource_pool;
 
     namespace ctx = boost::context;
 
@@ -40,8 +38,6 @@ namespace AsyncRuntime {
         virtual void suspend_with(std::function<void(coroutine_handler *handler)> fn) = 0;
 
         virtual task *resume_task() = 0;
-
-        virtual resource_pool *get_resource() const = 0;
 
         const task::execution_state &get_execution_state() const { return execution_state; }
 
@@ -125,18 +121,8 @@ namespace AsyncRuntime {
     public:
         coroutine() = default;
 
-        explicit coroutine(coroutine::Fn &&f) : fn(f), end{false}, resource{nullptr} {
+        explicit coroutine(coroutine::Fn &&f) : fn(f), end{false} {
             continuation = ctx::continuation(ctx::callcc(std::allocator_arg, basic_fixedsize_stack<ctx::stack_traits>(), [this](ctx::continuation &&c) {
-                y.continuation = std::move(c);
-                y.continuation = y.continuation.resume();
-                call();
-                end.store(true, std::memory_order_relaxed);
-                return std::move(y.continuation);
-            }));
-        }
-
-        explicit coroutine(coroutine::Fn &&f, resource_pool *res) : fn(f), end{false}, resource{res} {
-            continuation = ctx::continuation(ctx::callcc(std::allocator_arg, pooled_fixedsize_stack<ctx::stack_traits>(res), [this](ctx::continuation &&c) {
                 y.continuation = std::move(c);
                 y.continuation = y.continuation.resume();
                 call();
@@ -183,8 +169,6 @@ namespace AsyncRuntime {
 
         std::shared_ptr<coroutine_t> get_ptr() { return std::static_pointer_cast<coroutine_t>(shared_from_this()); };
 
-        resource_pool *get_resource() const final { return resource; }
-
         void init_promise() { y.promise = {}; }
 
 #if defined(MEASURE_CPU_TIME)
@@ -208,7 +192,6 @@ namespace AsyncRuntime {
         ctx::continuation continuation;
         std::atomic_bool end;
         yield_t y;
-        resource_pool *resource = nullptr;
 #if defined(MEASURE_CPU_TIME)
         std::atomic_size_t cpu_time{0};
 #endif
@@ -274,15 +257,6 @@ namespace AsyncRuntime {
         std::shared_ptr<coroutine<Ret>> coro;
     };
 
-    template<typename T>
-    Allocator<T>::Allocator(const coroutine_handler *handler) {
-        if (handler->get_resource() != nullptr) {
-            resource = handler->get_resource();
-        } else {
-            resource = GetDefaultResource();
-        }
-    }
-
     template <typename Ret = void, typename Fn, typename ...Arguments>
     std::shared_ptr<coroutine<Ret>> make_coroutine(Fn &&fn, Arguments &&... args) {
         return std::make_shared<coroutine<Ret>>(std::bind(std::forward<Fn>(fn), std::placeholders::_1, std::placeholders::_2, std::forward<Arguments>(args)...));
@@ -291,18 +265,6 @@ namespace AsyncRuntime {
     template <typename Ret = void, typename Fn>
     std::shared_ptr<coroutine<Ret>> make_coroutine(Fn &&fn) {
         return std::make_shared<coroutine<Ret>>(std::forward<Fn>(fn));
-    }
-
-    template <typename Ret = void, typename Fn, typename ...Arguments>
-    std::shared_ptr<coroutine<Ret>> make_coroutine(resource_pool *resource, Fn &&fn, Arguments &&... args) {
-        return std::allocate_shared<coroutine<Ret>>(Allocator<coroutine<Ret>>(resource),
-                std::bind(std::forward<Fn>(fn), std::placeholders::_1, std::placeholders::_2, std::forward<Arguments>(args)...),
-                resource);
-    }
-
-    template <typename Ret = void, typename Fn>
-    std::shared_ptr<coroutine<Ret>> make_coroutine(resource_pool *resource, Fn &&fn) {
-        return std::allocate_shared<coroutine<Ret>>(Allocator<coroutine<Ret>>(resource), std::forward<Fn>(fn), resource);
     }
 
     typedef coroutine_handler CoroutineHandler;

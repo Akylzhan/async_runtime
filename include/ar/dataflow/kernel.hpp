@@ -4,11 +4,8 @@
 #include "ar/dataflow/sink.hpp"
 #include "ar/dataflow/source.hpp"
 #include "ar/dataflow/notifier.hpp"
-#include "ar/dataflow/port.hpp"
 #include "ar/dataflow/kernel_events.hpp"
-#include "ar/allocators.hpp"
 
-#include "tmc/aw_yield.hpp"
 #include "tmc/sync.hpp"
 #include "tmc/task.hpp"
 #include "tmc/ex_cpu.hpp"
@@ -48,10 +45,6 @@ namespace AsyncRuntime::Dataflow {
         }
 
         int GetErrorCode() const { return error_code; }
-
-        void SetResource(resource_pool *res) { resource = res; }
-
-        resource_pool *GetResource() { return resource; }
     protected:
         int Interrupt() {
             if (interrupt_callback) {
@@ -60,8 +53,6 @@ namespace AsyncRuntime::Dataflow {
                 return 0;
             }
         }
-
-      resource_pool *resource = nullptr;
 
     private:
         std::function<int(void*)> interrupt_callback;
@@ -79,7 +70,6 @@ namespace AsyncRuntime::Dataflow {
                       "KernelContextT must derive from KernelContext");
     public:
         explicit Kernel(const std::string &name);
-        Kernel(resource_pool *resource, const std::string &name);
 
         virtual ~Kernel();
 
@@ -141,7 +131,6 @@ namespace AsyncRuntime::Dataflow {
         Source source;
         Sink sink;
         Notifier process_notifier;
-        resource_pool *resource = nullptr;
         std::atomic<KernelState> state{};
     private:
         std::string name;
@@ -161,15 +150,6 @@ namespace AsyncRuntime::Dataflow {
     }
 
     template<class KernelContextT>
-    Kernel<KernelContextT>::Kernel(resource_pool *res, const std::string &name)
-            : source(res, &process_notifier)
-            , sink(&process_notifier)
-            , name(name)
-            , state{kREADY}
-            , resource(res) {
-    }
-
-    template<class KernelContextT>
     Kernel<KernelContextT>::~Kernel() {
         source.Flush();
         sink.DisconnectAll();
@@ -178,10 +158,10 @@ namespace AsyncRuntime::Dataflow {
     template<class KernelContextT>
     tmc::task<int> Kernel<KernelContextT>::AsyncLoop(std::function<void(int)> terminated_callback) {
         auto result = co_await AsyncLoopBody();
+        loop_semaphore.release();
         if (terminated_callback) {
             terminated_callback(result);
         }
-        loop_semaphore.release();
         co_return result;
     }
 
@@ -215,7 +195,6 @@ namespace AsyncRuntime::Dataflow {
     tmc::task<int> Kernel<KernelContextT>::AsyncInit() {
         try {
             kernel_context = std::make_unique<KernelContextT>();
-            kernel_context->SetResource(resource);
             int init_error = co_await OnInit(kernel_context.get());
             if (init_error != 0) {
                 OnDispose(kernel_context.get());
