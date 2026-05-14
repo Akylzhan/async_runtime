@@ -66,10 +66,6 @@ configure_file(version.in ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 
 include(cmake/boost.cmake)
 
-add_library(TooManyCooks ${CMAKE_CURRENT_SOURCE_DIR}/third_party/TooManyCooks.cpp)
-target_include_directories(TooManyCooks PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/TooManyCooks/include)
-target_compile_definitions(TooManyCooks PUBLIC TMC_USE_BOOST_ASIO TMC_MORE_THREADS)
-
 if (WITH_TRACE)
     include(cmake/trace.cmake)
 endif()
@@ -89,7 +85,7 @@ add_library(${LIB_NAME} ${SOURCES})
 
 target_include_directories(${LIB_NAME} PUBLIC include/ src/ src/io ${CMAKE_CURRENT_BINARY_DIR})
 
-target_link_libraries(${LIB_NAME} PUBLIC pthread ${Boost_LIBRARIES} TooManyCooks)
+target_link_libraries(${LIB_NAME} PUBLIC pthread ${Boost_LIBRARIES} TooManyCooks::TooManyCooks)
 
 if (WITH_NUMA)
     target_link_libraries(${LIB_NAME} PUBLIC numa)
